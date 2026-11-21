@@ -1,0 +1,4 @@
+[build]
+  # Bare innholdet i public/ blir en del av nettsiden. Funksjonskoden publiseres ikke som filer.
+  publish = "public"
+  functions = "netlify/functions"

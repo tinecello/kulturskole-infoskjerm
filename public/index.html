@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kulturskolens infoskjerm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Caveat:wght@700&display=swap">
+<style>
+/* Layout: tavle i fast 1920×1080-scene, delt i to. Venstre: Rom 1–10 (alltid alle ti). Høyre: de andre rommene, deretter endringer og nytt.
+   Innholdet kommer fra en fast ukeplan (UKE) pluss tillegg for enkeltdatoer (EKSTRA), endringer (ENDRINGER) og ferier (FERIE).
+   Størrelser for 55–65" skjerm på 3–5 meter: lærernavn 44 px, fag og tid 30–32 px, ingenting under 22 px. */
+:root{
+  --bg:#1d1b26; --rowa:#26232f; --rowb:#211f2a; --line:#36323f;
+  --fg:#f7f2ea; --dim:#b9b1c2; --accent:#f3a861; --live:#a8d8b4; --past:#7f798c;
+  --off:#ff9a8f; --offbg:#4a2730;
+  --f:"Barlow Semi Condensed","Arial Narrow",sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{margin:0;background:#000;overflow:hidden;cursor:none}
+.fit{position:fixed;inset:0}
+.stage{position:absolute;top:0;left:0;width:1920px;height:1080px;transform-origin:0 0;background:var(--bg);color:var(--fg);
+  display:flex;flex-direction:column;box-sizing:border-box;font-family:var(--f)}
+.tn{font-variant-numeric:tabular-nums}
+
+
+.hd{display:flex;justify-content:space-between;align-items:center;padding:16px 32px;background:var(--accent);color:var(--bg)}
+.hd h1{font:700 56px/1 var(--f);margin:0}
+.hd h1 small{font:600 32px/1 var(--f);margin-left:22px;opacity:.75}
+.hd .ck{font:700 72px/1 var(--f)}
+
+/* Bursdag i toppbanneret: hilsen i håndskrift (Caveat), kake og ballong som vugger, teksten pulserer lett
+   og konfetti drysser bare rundt hilsenen, så tittel og klokke er lette å lese.
+   Animasjonene får negativ forsinkelse ut fra klokka (--d), så de ikke hopper når skjermen tegnes på nytt hvert 20. sekund. */
+.hd{position:relative;overflow:hidden}
+.hd h1{flex:none}
+.bd{position:relative;flex:1;min-width:0;align-self:stretch;margin:-16px 30px;display:flex;align-items:center;justify-content:center;gap:18px;
+  font:700 60px/1 "Caveat",cursive;white-space:nowrap}
+.bd.lang{font-size:50px}
+.bd svg{width:70px;height:70px;flex:none;position:relative;z-index:1;animation:vugg 2.4s ease-in-out infinite;animation-delay:var(--d)}
+.bd svg.ballong{animation-direction:alternate-reverse}
+.bd span{position:relative;z-index:1;overflow:hidden;text-overflow:ellipsis;padding:0 4px;animation:puls 2.4s ease-in-out infinite;animation-delay:var(--d)}
+.bd .konf{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.bd .konf i{position:absolute;top:-16px;width:11px;height:15px;border-radius:2px;animation:fall linear infinite}
+@keyframes fall{to{transform:translateY(140px) rotate(400deg)}}
+@keyframes vugg{0%,100%{transform:rotate(-8deg) translateY(0)}50%{transform:rotate(8deg) translateY(-5px)}}
+@keyframes puls{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+
+.cols{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:0 24px;padding:0 32px 14px;min-height:0}
+.col{display:flex;flex-direction:column;min-width:0;min-height:0}
+.th{display:grid;grid-template-columns:170px 1fr;column-gap:14px;font:700 22px/1 var(--f);color:var(--dim);letter-spacing:.12em;text-transform:uppercase;padding:12px 12px 8px}
+.r{display:grid;grid-template-columns:170px 1fr;column-gap:14px;align-items:center;padding:0 12px;border-top:2px solid var(--line);background:var(--rowa)}
+.r:nth-of-type(even){background:var(--rowb)}
+.left .r{flex:1 1 0;min-height:0}
+.right .r{padding-block:6px;min-height:88px;flex-grow:0 !important}
+.rm{font:700 34px/1.05 var(--f);color:var(--accent)}
+.items{display:flex;flex-direction:column;gap:4px;min-width:0}
+.it{display:grid;grid-template-columns:180px 1fr;column-gap:14px;align-items:center;padding:4px 12px;border-radius:5px;min-width:0}
+.it time{font:700 31px/1 var(--f);color:var(--accent);white-space:nowrap}
+.it .nm{display:flex;flex-direction:column;min-width:0}
+.it b{font:700 44px/1.02 var(--f);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it small{font:600 30px/1.05 var(--f);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* «Om x min» står på linjen under navnet, så navnet får hele bredden */
+.it em{font:700 24px/1 var(--f);font-style:normal;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap;color:var(--accent)}
+.it small em{margin-left:12px}
+.it.past{opacity:.5}
+.it.past time{color:var(--past)}
+.it.past b{font-weight:600}
+.it.live{background:var(--live);color:var(--bg)}
+.it.live time,.it.live small{color:var(--bg)}
+.it.soon{box-shadow:inset 0 0 0 3px var(--accent)}
+/* Avlyst (sykdom o.l.): grått, gjennomstreket navn og merket AVLYST */
+.it.off{background:var(--offbg);box-shadow:inset 0 0 0 2px var(--off)}
+.it.off time,.it.off em{color:var(--off)}
+.it.off b{color:var(--off);text-decoration:line-through;text-decoration-thickness:3px}
+.it.off small{color:var(--off)}
+.compact .left .items{gap:2px}
+.compact .left .it{padding:2px 12px}
+.compact .left .it b{font-size:38px}
+.compact .left .it small{font-size:26px}
+/* Høyre side har flere grupper per rom: litt mindre tekst så lange gruppenavn får plass */
+.right .it{grid-template-columns:150px 1fr;padding:3px 12px}
+.right .it time{font-size:27px}
+.right .it b{font-size:35px}
+.right .it small{font-size:25px}
+.empty{font:600 30px/1 var(--f);color:var(--past);padding-left:12px}
+
+.panel{margin-top:14px;flex:1;overflow:hidden;display:flex;flex-direction:column;gap:14px;border-top:4px solid var(--accent);padding:14px 12px 0;min-height:0}
+.panel h2{font:700 22px/1 var(--f);color:var(--dim);letter-spacing:.12em;text-transform:uppercase;margin:0}
+.news{display:flex;flex-direction:column;gap:14px}
+.news div{font:700 38px/1.1 var(--f)}
+.news div span{display:block;font:600 30px/1.15 var(--f);color:var(--dim)}
+.legend{margin-top:auto;display:flex;gap:30px;font:600 26px/1 var(--f);color:var(--dim)}
+.legend span{display:flex;align-items:center;gap:10px}
+.legend i{width:26px;height:20px;border-radius:4px;display:inline-block}
+
+.closed{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;text-align:center;padding:0 120px}
+.closed b{font:700 120px/1 var(--f);color:var(--accent)}
+.closed span{font:600 48px/1.2 var(--f);color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="fit" id="fit"><div class="stage" id="stage"></div></div>
+
+<script>
+// ─── Fast ukeplan (1 = mandag … 5 = fredag). Oppdateres når timeplanen endres, typisk ved semesterstart. ───
+// Kilde: SpeedAdmin, Lørenskog Hus: Romoversikt uke 44–45 (lærerblokker), Søk › Grupper (alle grupper med dag, tid og rom)
+// og lærernes Timer-side (fag). Ingen elevnavn.
+const UKE = {
+  1: [
+    // Grupper (Søk › Grupper i SpeedAdmin)
+    { rom:'Kunstrom', gruppe:'Kunstkurs 1', laerer:'Camilla Malmquist', s:'17:00', e:'18:30' },
+    { rom:'Kunstrom', gruppe:'Kunstkurs 2', laerer:'Camilla Malmquist', s:'18:30', e:'20:00' },
+    { rom:'Madsensalen', gruppe:'Dansemix 3.–4. klasse', laerer:'Gina Alemán Herrera', s:'16:00', e:'16:45' },
+    { rom:'Madsensalen', gruppe:'Dansemix 1.–2. klasse', laerer:'Gina Alemán Herrera', s:'16:50', e:'17:35' },
+    { rom:'Madsensalen', gruppe:'Streetkids 2.–3. klasse', laerer:'Gina Alemán Herrera', s:'17:40', e:'18:25' },
+    { rom:'Madsensalen', gruppe:'Hip-hop nybegynnere 5. kl. +', laerer:'Gina Alemán Herrera', s:'18:30', e:'19:30' },
+    { rom:'Rom 3', gruppe:'Samspill – diverse grupper', s:'16:15', e:'19:30', fast:true },
+    // Enkeltundervisning (lærerblokker i Romoversikten)
+    { rom:'Rom 1', laerer:'Mads Lønnkvist', fag:'Klarinett, saksofon', s:'14:00', e:'15:30' },
+    { rom:'Rom 2', laerer:'Anders Hofstad Sørås', fag:'Gitar', s:'14:00', e:'21:00' },
+    { rom:'Rom 3', laerer:'Marianne Elnes', fag:'Baryton, trombone, tuba', s:'14:00', e:'21:00' },
+    { rom:'Rom 4', laerer:'Magne Askeland', fag:'Fiolin', s:'14:00', e:'20:00' },
+    { rom:'Rom 5', laerer:'Kristin Helene Vestvik', fag:'Fiolin', s:'14:00', e:'20:00' },
+    { rom:'Rom 6', laerer:'Tine Johnsgaard', fag:'Cello', s:'14:00', e:'20:00' },
+    { rom:'Rom 7', laerer:'Tone-Cecilie Sjølie', fag:'Musikkterapi', s:'18:30', e:'20:00' },
+    { rom:'Rom 8', laerer:'Karoline Dahl Gullberg', fag:'Sang', s:'13:00', e:'20:00' },
+    { rom:'Rom 9', laerer:'Pål Gløtta', fag:'Trompet', s:'14:00', e:'20:00' },
+    { rom:'Rom 10', laerer:'Adrian Danielsen', fag:'Piano', s:'14:00', e:'20:00' },
+    { rom:'Slagverk', laerer:'Christian Skaugen', fag:'Gitar', s:'10:00', e:'20:00' },
+  ],
+  2: [
+    { rom:'Madsensalen', laerer:'Lennart Wolfgramm', fag:'Piano', s:'18:30', e:'19:00' },
+    { rom:'Rom 2', laerer:'André Aarvik', fag:'Musikkterapi', s:'15:30', e:'16:30' },
+    { rom:'Rom 3', laerer:'Marianne Elnes', fag:'Baryton, trombone, tuba', s:'12:00', e:'21:00' },
+    { rom:'Rom 4', laerer:'Magne Askeland', fag:'Fiolin', s:'13:00', e:'18:00' },
+    { rom:'Rom 5', laerer:'Kristin Helene Vestvik', fag:'Fiolin', s:'13:00', e:'21:00' },
+    { rom:'Rom 6', laerer:'Lennart Wolfgramm', fag:'Piano', s:'15:00', e:'20:00' },
+    { rom:'Rom 8', laerer:'Karoline Dahl Gullberg', fag:'Sang', s:'14:00', e:'20:00' },
+    { rom:'Rom 9', laerer:'Linda Christine Bergaplass', fag:'Fløyte', s:'13:00', e:'21:00' },
+    { rom:'Slagverk', laerer:'Christian Skaugen', fag:'Gitar', s:'10:00', e:'20:00' },
+  ],
+  3: [
+    // Grupper
+    { rom:'Kunstrom', gruppe:'FDS Redesign 1', laerer:'Eli Sundby, Bianca Elena Chiru', s:'14:15', e:'15:45' },
+    { rom:'Kunstrom', gruppe:'FDS Redesign 2', laerer:'Eli Sundby, Bianca Elena Chiru', s:'15:45', e:'17:15' },
+    { rom:'Kunstrom', gruppe:'Gitarkurs voksne – nybegynner', laerer:'Morten Mortensen', s:'17:30', e:'18:30' },
+    { rom:'Kunstrom', gruppe:'Gitarkurs voksne – viderekommen', laerer:'Morten Mortensen', s:'18:30', e:'19:20' },
+    { rom:'Kunstrom', gruppe:'Gitarkurs voksne – øvet', laerer:'Morten Mortensen', s:'19:30', e:'20:30' },
+    { rom:'Madsensalen', gruppe:'Demenskoret Lørenskog', laerer:'Tone-Cecilie Sjølie, Marianne Lie Eide', s:'11:00', e:'12:00' },
+    { rom:'Madsensalen', gruppe:'Fargespill', s:'13:00', e:'15:00', fast:true },
+    { rom:'Madsensalen', gruppe:'FDS The Beat 1', laerer:'Marianne Elnes, Thulani Maluleka', s:'13:30', e:'14:30' },
+    { rom:'Madsensalen', gruppe:'Fargespill gruppe 1', s:'16:30', e:'18:00' },
+    { rom:'Rom 3', gruppe:'FDS The Beat 2', laerer:'Marianne Elnes, Thulani Maluleka', s:'14:30', e:'16:00' },
+    { rom:'Rom 8', gruppe:'Fargespill gruppe 2', s:'18:00', e:'19:00' },
+    // Enkeltundervisning
+    { rom:'Rom 1', laerer:'Mads Lønnkvist', fag:'Klarinett, saksofon', s:'12:00', e:'22:00' },
+    { rom:'Rom 2', laerer:'Anders Hofstad Sørås', fag:'Gitar', s:'14:00', e:'21:00' },
+    { rom:'Rom 3', laerer:'Marianne Elnes', fag:'Baryton, trombone, tuba', s:'10:00', e:'21:00' },
+    { rom:'Rom 4', laerer:'Britt Gjertrud Haaland', fag:'Valthorn', s:'15:45', e:'20:15' },
+    { rom:'Rom 5', laerer:'Kristin Helene Vestvik', fag:'Fiolin', s:'12:00', e:'20:00' },
+    { rom:'Rom 6', laerer:'Signe-Marie Filtvedt', fag:'Piano', s:'18:00', e:'22:00' },
+    { rom:'Rom 7', laerer:'Minnie Einersen', fag:'Piano', s:'13:00', e:'20:00' },
+    { rom:'Rom 8', laerer:'Tone-Cecilie Sjølie', fag:'Musikkterapi', s:'14:00', e:'15:00' },
+    { rom:'Rom 9', laerer:'Anne Jordhus-Lier', fag:'Fløyte', s:'14:00', e:'22:00' },
+    { rom:'Rom 10', laerer:'Adrian Danielsen', fag:'Piano', s:'14:00', e:'20:00' },
+    { rom:'Slagverk', laerer:'Christian Skaugen', fag:'Gitar', s:'10:00', e:'20:00' },
+  ],
+  4: [
+    // Grupper
+    { rom:'Kunstrom', gruppe:'Kunstkurs 1', laerer:'Camilla Malmquist', s:'17:00', e:'18:30' },
+    { rom:'Kunstrom', gruppe:'Kunstkurs 2', laerer:'Camilla Malmquist', s:'18:30', e:'20:00' },
+    { rom:'Madsensalen', gruppe:'LUS – orkester 1', laerer:'Tine Johnsgaard, Kristin Helene Vestvik', s:'16:45', e:'17:45' },
+    { rom:'Madsensalen', gruppe:'LUS – orkester 2', laerer:'Tine Johnsgaard, Kristin Helene Vestvik', s:'18:00', e:'19:30' },
+    // Enkeltundervisning
+    { rom:'Madsensalen', laerer:'Thulani Maluleka', fag:'', s:'09:00', e:'12:00' },
+    { rom:'Rom 1', laerer:'Mads Lønnkvist', fag:'Klarinett, saksofon', s:'12:00', e:'22:00' },
+    { rom:'Rom 3', laerer:'Marianne Elnes', fag:'Baryton, trombone, tuba', s:'10:00', e:'22:00' },
+    { rom:'Rom 4', laerer:'Magne Askeland', fag:'Fiolin', s:'14:00', e:'16:30' },
+    { rom:'Rom 5', laerer:'Kristin Helene Vestvik', fag:'Fiolin', s:'14:00', e:'18:00' },
+    { rom:'Rom 6', laerer:'Lennart Wolfgramm', fag:'Piano', s:'15:00', e:'20:00' },
+    { rom:'Rom 7', laerer:'Minnie Einersen', fag:'Piano', s:'13:00', e:'20:00' },
+    { rom:'Rom 8', laerer:'Andreas Hovelsås Fossum', fag:'Trompet', s:'16:00', e:'20:00' },
+    { rom:'Slagverk', laerer:'Christian Skaugen', fag:'Gitar', s:'10:00', e:'20:00' },
+  ],
+  5: [
+    { rom:'Rom 2', laerer:'André Aarvik', fag:'Musikkterapi', s:'14:15', e:'15:15' },
+    { rom:'Rom 9', laerer:'Linda Christine Bergaplass', fag:'Fløyte', s:'15:00', e:'17:00' },
+  ],
+};
+
+// ─── Tillegg for enkeltdatoer (konserter, seminarer, ekstra øvelser) ───
+const EKSTRA = {
+  '2026-10-30': [ { rom:'Madsensalen', gruppe:'Korpsarrangement', laerer:'Ante Skaug', s:'09:00', e:'22:00' } ],
+  '2026-11-06': [
+    { rom:'Kunstrom', gruppe:'Romerike fløyteensemble', s:'17:00', e:'19:30' },
+    { rom:'Madsensalen', gruppe:'Romerike fløyteensemble', s:'17:00', e:'19:30' },
+  ],
+};
+// ─── Endringer som vises i egen boks («Endringer i dag») ───
+const ENDRINGER = {
+  '2026-10-30': [ 'Madsensalen er opptatt hele dagen (korpsarrangement)' ],
+  '2026-11-06': [ 'Romerike fløyteensemble i Kunstrom og Madsensalen kl. 17–19:30' ],
+};
+// ─── Ferier og fridager: skjermen viser bare navnet på ferien ───
+const FERIE = [
+  { fra:'2026-12-19', til:'2027-01-03', navn:'God jul! Juleferie' },
+  { fra:'2027-02-22', til:'2027-02-26', navn:'Vinterferie' },
+];
+// ─── Bursdager for ansatte: 'MM-DD': ['Navn', …]. Bare dag og måned, aldri år. ───
+// Kilde: bursdager_ansatte.xlsx. Hilsenen vises i toppbanneret hele dagen. Lørdag vises fredag («i morgen»), søndag vises mandag («gårsdagen»).
+// Test uten å endre lista: legg ?bursdag=Navn bak adressen.
+const BURSDAGER = {
+  '01-12': ['Simon Thulani Maluleka'],
+  '01-23': ['Kjersti Østnes Eggum'],
+  '01-27': ['Linda Christine Bergaplass'],
+  '02-05': ['Kristine Johnsgaard'],
+  '02-10': ['Henning Hanssen'],
+  '02-14': ['Minnie Einersen'],
+  '02-19': ['Camilla Malmquist'],
+  '02-22': ['Tuva Rein'],
+  '02-26': ['Geir Moe Daasvand'],
+  '03-06': ['Andre Aarvik'],
+  '03-26': ['Jonas Karlsen'],
+  '03-27': ['Asle Bråthen'],
+  '03-30': ['Sara Johanne Rønne'],
+  '04-05': ['Steinar Mossige'],
+  '04-09': ['Kristian Frostad'],
+  '04-11': ['Signe-Marie Filtvedt'],
+  '04-17': ['Bianca Elena Chiru'],
+  '04-25': ['Marianne Ommedal'],
+  '04-26': ['Eirin Rogdaberg Skimmeli', 'Georgina Aleman Herrera'],
+  '05-05': ['Jalia Kuria Komeja'],
+  '05-12': ['Daniella van Dijk-Wennberg'],
+  '05-14': ['Marianne Lie Eide'],
+  '05-22': ['Magne Askeland'],
+  '06-03': ['Andreas Hovelsås Fossum'],
+  '06-04': ['Mian Friis-Larsen'],
+  '06-06': ['Øyvind Fosgaard'],
+  '06-19': ['Liv Leirevaag Mongstad'],
+  '06-24': ['Marianne Elnes'],
+  '07-10': ['Anne Jordhus-Lier'],
+  '07-16': ['Tone-Cecilie Bekken Sjølie'],
+  '07-27': ['Adrian Danielsen'],
+  '07-30': ['Lennart Wolfgramm'],
+  '08-06': ['Ante Skaug'],
+  '08-26': ['Christian Skaugen', 'Pia Karine Bjørnseth Tviberg'],
+  '09-12': ['Sturla Riis Mossefinn'],
+  '10-05': ['Britt Gjertrud Haaland', 'Nasra Ahmed Mohammed'],
+  '10-13': ['Emilie Mordal'],
+  '10-14': ['Limar Aljber'],
+  '10-21': ['Dima Jorge Hashisho', 'Mads Lønnkvist'],
+  '10-26': ['Karoline Dahl Gullberg'],
+  '11-19': ['Ada Odegard Risberg'],
+  '12-13': ['Pål Gunnar Gløtta'],
+  '12-25': ['Kristin Helene Vestvik'],
+  '12-27': ['Anders Hofstad Sørås'],
+};
+// ─── Runde dager: får egen hilsen («Gratulerer med 30-årsdagen, Ada!»). Bare de som fyller rundt, legges inn her. ───
+const RUNDE = [
+  { navn:'Ada Odegard Risberg', dato:'2026-11-19', alder:30 },
+  { navn:'Mads Lønnkvist', dato:'2027-10-21', alder:40 },
+];
+// «Nytt fra kulturskolen» hentes fra SpeedAdmin (Portal › Nyheter › Legg til nyhet) via /api/program.
+// Er det ingen nyheter, vises ikke feltet.
+let NYTT = [];
+// Meldinger fra SpeedAdmin med «avlyst» eller «syk» i tittelen (vises i «Endringer i dag»)
+let AVLYST = [];
+
+// Faste rom: Rom 1–10 til venstre i fast rekkefølge, de andre til høyre.
+const VENSTRE = ['Rom 1','Rom 2','Rom 3','Rom 4','Rom 5','Rom 6','Rom 7','Rom 8','Rom 9','Rom 10'];
+const HOYRE = ['Kunstrom','Madsensalen','Slagverk'];
+const DAGNAVN = ['søndag','mandag','tirsdag','onsdag','torsdag','fredag','lørdag'];
+const MND = ['januar','februar','mars','april','mai','juni','juli','august','september','oktober','november','desember'];
+
+const toMin = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+const fmt = m => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(Math.floor(m%60)).padStart(2,'0')}`;
+const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// Forhåndsvisning: null = følg ekte dato og klokke
+let viewDay = null, viewTime = null;
+
+function currentDate(){
+  const today = new Date();
+  if (viewDay === null) return today;
+  const d = new Date(today); // samme uke som i dag, valgt ukedag
+  d.setDate(today.getDate() - ((today.getDay() + 6) % 7) + (viewDay - 1));
+  return d;
+}
+function currentMin(){ const n = new Date(); return viewTime ?? (n.getHours()*60 + n.getMinutes() + n.getSeconds()/60); }
+
+// Er raden nevnt i en «avlyst»/«syk»-melding i dag? Treff på helt lærernavn, gruppenavn,
+// eller bare fornavn når ingen andre lærere i dag har samme fornavn.
+const norm = s => ` ${String(s || '').toLowerCase().replace(/[^a-z0-9æøåäöéü]+/g, ' ').trim()} `;
+let dagensRader = [];
+function treffer(melding, r){
+  const t = norm(melding.tittel);
+  const navn = (r.laerer || '').split(',').map(x => x.trim()).filter(Boolean);
+  const fornavn = n => n.split(' ')[0];
+  const alleFornavn = dagensRader.flatMap(x => (x.laerer || '').split(',').map(y => fornavn(y.trim())).filter(Boolean));
+  return (r.gruppe && t.includes(norm(r.gruppe))) ||
+    navn.some(n => t.includes(norm(n)) ||
+      (alleFornavn.filter(f => f === fornavn(n)).length === 1 && t.includes(norm(fornavn(n)))));
+}
+function erAvlyst(r){
+  return AVLYST.some(m => treffer(m, r));
+}
+
+function item(r, n){
+  const s = toMin(r.s), e = toMin(r.e);
+  const off = erAvlyst(r);
+  const cls = off ? 'off' : e <= n ? 'past' : s <= n ? 'live' : (s - n <= 15 ? 'soon' : '');
+  const name = r.gruppe || r.laerer;
+  // Grupper med mer enn to lærere vises uten lærernavn
+  const laerere = (r.laerer || '').split(',').map(x => x.trim()).filter(Boolean);
+  const sub = r.gruppe ? (laerere.length > 2 ? '' : laerere.join(', ')) : r.fag;
+  const tag = off ? 'Avlyst' : cls === 'soon' ? `Om ${Math.ceil(s-n)} min` : '';
+  const under = sub || tag ? `<small>${esc(sub)}${tag ? `<em>${tag}</em>` : ''}</small>` : '';
+  return `<div class="it ${cls}"><time class="tn">${r.s}–${r.e}</time><span class="nm"><b>${esc(name)}</b>${under}</span></div>`;
+}
+function roomRows(list, rows, n){
+  return list.map(room => {
+    const evs = rows.filter(r => r.rom === room).sort((a,b) => toMin(a.s)-toMin(b.s));
+    return `<div class="r" style="flex-grow:${Math.max(1, evs.length)}"><span class="rm">${esc(room)}</span><div class="items">${evs.length ? evs.map(r => item(r, n)).join('') : '<span class="empty">Ingen undervisning i dag</span>'}</div></div>`;
+  }).join('');
+}
+
+// ─── Bursdag i toppbanneret ───
+const KAKE = `<svg viewBox="0 0 64 64" aria-hidden="true"><g stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><rect x="8" y="32" width="48" height="24" rx="4" fill="#fff3e0"/><rect x="8" y="46" width="48" height="10" rx="3" fill="#8a5a44"/><path d="M8 38c0-6 4-6 4-6h40s4 0 4 6c-5 5-9 5-14 1s-9-4-14 0-9 4-14 0c-3 3-5 3-6-1z" fill="#ef7fa0"/><rect x="19" y="20" width="6" height="12" rx="1.5" fill="#7fc8f8"/><rect x="29" y="18" width="6" height="14" rx="1.5" fill="#a8d8b4"/><rect x="39" y="20" width="6" height="12" rx="1.5" fill="#c9b6ff"/></g><g fill="#ffd36e" stroke="#e8743b" stroke-width="1.5"><path d="M22 7c4 5 4 9 0 10-4-1-4-5 0-10z"/><path d="M32 5c4 5 4 9 0 10-4-1-4-5 0-10z"/><path d="M42 7c4 5 4 9 0 10-4-1-4-5 0-10z"/></g><g fill="#fff"><circle cx="20" cy="51" r="1.6"/><circle cx="32" cy="52" r="1.6"/><circle cx="44" cy="51" r="1.6"/></g></svg>`;
+const BALLONG = `<svg class="ballong" viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="24" rx="15" ry="18" fill="#ef7fa0" stroke="currentColor" stroke-width="3.5"/><path d="M29 43l3-2 3 2z" fill="currentColor"/><path d="M32 44c-4 5 4 9 0 14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><ellipse cx="26" cy="17" rx="3.5" ry="6" fill="#fff" opacity=".6"/></svg>`;
+const navneliste = a => a.length < 2 ? a.join('') : `${a.slice(0, -1).join(', ')} og ${a[a.length - 1]}`;
+const mmdd = d => `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+// Test: legg ?bursdag=Navn (eller ?bursdag=Navn1,Navn2) bak adressen
+const TESTBURSDAG = (new URLSearchParams(location.search).get('bursdag') || '').split(',').map(x => x.trim()).filter(Boolean);
+// Lørdagsbursdager vises fredagen før («i morgen»), søndagsbursdager mandagen etter («gårsdagen»).
+// Er det flere slags hilsener samme dag, veksler banneret mellom dem hvert 20. sekund.
+// Runde dager får hver sin hilsen; de andre samme dag deler én.
+function dagensBursdager(d){
+  if (TESTBURSDAG.length) return [{ tekst: 'Gratulerer med dagen', navn: TESTBURSDAG }];
+  const hilsener = [];
+  const legg = (dager, vanlig, rund) => {
+    const h = new Date(d); h.setDate(d.getDate() + dager);
+    const navn = BURSDAGER[mmdd(h)] || [];
+    const runde = RUNDE.filter(r => r.dato === iso(h) && navn.includes(r.navn));
+    for (const r of runde) hilsener.push({ tekst: rund(r.alder), navn: [r.navn] });
+    const andre = navn.filter(n => !runde.some(r => r.navn === n));
+    if (andre.length) hilsener.push({ tekst: vanlig, navn: andre });
+  };
+  legg(0, 'Gratulerer med dagen', a => `Gratulerer med ${a}-årsdagen`);
+  if (d.getDay() === 5) legg(1, 'Gratulerer med dagen i morgen', a => `Gratulerer med ${a}-årsdagen i morgen`);
+  if (d.getDay() === 1) legg(-1, 'Gratulerer med gårsdagen', a => `Gratulerer med ${a}-årsdagen i går`);
+  return hilsener;
+}
+function bursdagstekst(hilsen, kort){
+  if (!hilsen) return '';
+  const vis = kort ? hilsen.navn.map(n => n.split(' ')[0]) : hilsen.navn;
+  const tekst = `${hilsen.tekst}, ${navneliste(vis)}!`;
+  const t = Date.now() / 1000;
+  const farger = ['#ffffff','#fff3c4','#c9f0d6','#ffd0dc','#d8ccff'];
+  const konfetti = Array.from({ length: 26 }, (_, i) => {
+    const varighet = 2.4 + (i % 5) * 0.4;
+    return `<i style="left:${(i * 3.9 + (i % 4) * 1.7) % 100}%;background:${farger[i % farger.length]};animation-duration:${varighet}s;animation-delay:${(-((t + i * 0.61) % varighet)).toFixed(2)}s"></i>`;
+  }).join('');
+  return `<div class="bd${kort === 'liten' ? ' lang' : ''}" style="--d:${(-(t % 2.4)).toFixed(2)}s"><div class="konf">${konfetti}</div>${KAKE}<span>${esc(tekst)}</span>${BALLONG}</div>`;
+}
+// Blir hilsenen for lang: først bare fornavn, så litt mindre skrift
+function tilpassBursdag(navn){
+  for (const variant of [true, 'liten']) {
+    const el = document.querySelector('.bd span');
+    if (el && el.scrollWidth > el.clientWidth) el.closest('.bd').outerHTML = bursdagstekst(navn, variant);
+  }
+}
+
+function render(){
+  const d = currentDate(), n = currentMin(), key = iso(d), wd = d.getDay();
+  const dateLabel = `${DAGNAVN[wd]} ${d.getDate()}. ${MND[d.getMonth()]}`;
+  const hilsener = dagensBursdager(d);
+  const bursdag = hilsener.length ? hilsener[Math.floor(Date.now() / 20000) % hilsener.length] : null;
+  const header = `<header class="hd"><h1>Dagens program<small>${bursdag ? '' : 'Lørenskog Hus · '}${dateLabel}</small></h1>${bursdagstekst(bursdag)}<div class="ck tn">${fmt(n)}</div></header>`;
+  const ferie = FERIE.find(f => key >= f.fra && key <= f.til);
+  // Grupper kommer direkte fra SpeedAdmin når koblingen virker; ellers brukes den faste planen som reserve.
+  // Grupper som ikke finnes i SpeedAdmins gruppeliste (fast:true) står alltid i den faste planen.
+  const fraApi = apiGrupper(key);
+  const fast = (UKE[wd] || []).filter(r => !r.gruppe || r.fast || !fraApi);
+  const rows = [...fast, ...(fraApi || []), ...(EKSTRA[key] || [])];
+  dagensRader = rows;
+  const stage = document.getElementById('stage');
+
+  if (ferie || !rows.length) {
+    const title = ferie ? ferie.navn : 'Ingen undervisning i dag';
+    const sub = ferie ? 'Undervisningen starter igjen etter ferien.' : 'Velkommen tilbake mandag!';
+    stage.innerHTML = `${header}<div class="closed"><b>${esc(title)}</b><span>${esc(sub)}</span><span>${NYTT.map(x => esc(x.t) + ' · ' + esc(x.d)).join('<br>')}</span></div>`;
+    tilpassBursdag(bursdag);
+    return;
+  }
+  const head = `<div class="th"><span>Rom</span><span>Tid · lærer · fag</span></div>`;
+  // Avlysninger som treffer en time, vises bare som merking på raden. Bare meldinger uten
+  // treff (og egne endringer for datoen) vises som tekst, først i nyhetsfeltet.
+  const utenTreff = AVLYST.filter(m => !rows.some(r => treffer(m, r))).map(m => ({ t: m.tittel, d: m.tekst }));
+  const viktig = [...(ENDRINGER[key] || []).map(t => ({ t, d: '' })), ...utenTreff];
+  const nyheter = [...viktig, ...NYTT];
+  // Plass til nytt på høyre side: ingen når rommene er fulle, ett når det er trangt
+  const hoyreAntall = rows.filter(r => HOYRE.includes(r.rom)).length;
+  const full = hoyreAntall > 8;
+  const antallNytt = Math.min(nyheter.length, full ? 0 : hoyreAntall > 5 ? 1 : 2);
+  stage.classList.toggle('compact', rows.filter(r => VENSTRE.includes(r.rom)).length > 10);
+  // På fulle dager får en viktig melding plassen til fargeforklaringen
+  const fullMelding = full && viktig.length ? `<div class="news"><div>${esc(viktig[0].t)}</div></div>` : '';
+  stage.innerHTML = `${header}
+    <div class="cols">
+      <div class="col left">${head}${roomRows(VENSTRE, rows, n)}</div>
+      <div class="col right">${head}${roomRows(HOYRE, rows, n)}
+        <div class="panel">
+          ${antallNytt ? '<h2>Nytt fra kulturskolen</h2>' : ''}
+          <div class="news">${nyheter.slice(0, antallNytt).map(x => `<div>${esc(x.t)}<span>${esc(x.d)}</span></div>`).join('')}</div>
+          ${fullMelding || `<div class="legend"><span><i style="background:var(--live)"></i>Pågår nå</span><span><i style="box-shadow:inset 0 0 0 3px var(--accent)"></i>Starter snart</span><span><i style="background:var(--past)"></i>Ferdig</span>${AVLYST.length ? '<span><i style="background:var(--offbg);box-shadow:inset 0 0 0 2px var(--off)"></i>Avlyst</span>' : ''}</div>`}
+        </div>
+      </div>
+    </div>`;
+  tilpassBursdag(bursdag);
+}
+
+// ─── Kobling til SpeedAdmin (via /api/program på Netlify) ───
+// SpeedAdmin oppgir neste dato hver gruppe har undervisning. En gruppe vises bare den datoen,
+// så avlyste grupper forsvinner av seg selv. Grupper som allerede er vist i dag, huskes resten
+// av dagen, så de står igjen som «ferdig» selv om SpeedAdmin har flyttet datoen videre.
+let api = null; // { hentet: tidspunkt, grupper: [...] }, eller null før første svar
+const HUSK = 'infoskjerm-dagens-grupper';
+function husket(key){
+  try { const h = JSON.parse(localStorage.getItem(HUSK) || 'null'); return h && h.dato === key ? h.grupper : []; } catch (e) { return []; }
+}
+function husk(key, grupper){
+  try { localStorage.setItem(HUSK, JSON.stringify({ dato: key, grupper })); } catch (e) {}
+}
+function apiGrupper(key){
+  // Uten svar de siste 60 minuttene regnes koblingen som nede, og den faste planen brukes
+  if (!api || Date.now() - api.hentet > 60 * 60 * 1000) return null;
+  const idag = api.grupper.filter(g => g.dato === key);
+  const id = g => `${g.rom}|${g.gruppe}|${g.s}`;
+  const alle = new Map([...husket(key), ...idag].map(g => [id(g), g]));
+  const liste = [...alle.values()];
+  husk(key, liste);
+  return liste;
+}
+async function hentProgram(){
+  try {
+    const svar = await fetch('/api/program', { cache: 'no-store' });
+    const data = await svar.json();
+    if (data.ok) {
+      api = { hentet: Date.now(), grupper: data.grupper };
+      NYTT = (data.nyheter || []).map(x => ({ t: x.tittel, d: x.tekst }));
+      AVLYST = data.endringer || [];
+      render();
+    }
+  } catch (e) { /* ingen nett eller SpeedAdmin nede: behold det som vises */ }
+}
+hentProgram();
+setInterval(hentProgram, 5 * 60 * 1000);
+
+// Skaler 1920×1080-scenen til skjermen, sentrert
+function fit(){
+  const s = Math.min(innerWidth/1920, innerHeight/1080), st = document.getElementById('stage');
+  st.style.transform = `scale(${s})`;
+  st.style.left = `${(innerWidth - 1920*s)/2}px`; st.style.top = `${(innerHeight - 1080*s)/2}px`;
+}
+window.addEventListener('resize', fit);
+fit(); render();
+setInterval(render, 20000);
+
+// Se etter en ny versjon på Netlify hvert 15. minutt. Siden lastes bare på nytt når den nye
+// versjonen faktisk kan hentes, så skjermen aldri blir stående med en feilside hvis nettet er nede.
+setInterval(async () => {
+  try {
+    const svar = await fetch(location.href, { cache: 'no-store' });
+    if (svar.ok) location.reload();
+  } catch (e) { /* ingen nett: behold det som vises */ }
+}, 15 * 60 * 1000);
+// Hold skjermen våken der nettleseren tillater det
+async function keepAwake(){ try { await navigator.wakeLock?.request('screen'); } catch (e) {} }
+keepAwake(); document.addEventListener('visibilitychange', () => { if (!document.hidden) keepAwake(); });
+</script>
+</body>
+</html>
