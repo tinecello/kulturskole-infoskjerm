@@ -45,6 +45,26 @@ function laerere(s) {
   return alle.filter(n => !ALDRI_VIS.some(re => re.test(n))).join(', ');
 }
 
+// Bilde til en nyhet: bildet som er lastet opp på nyheten i SpeedAdmin (hentes via /api/nyhetsbilde),
+// ellers et annet bildefelt eller første <img> i nyhetsteksten.
+const URL_OK = /^(https?:\/\/|data:image\/)/i;
+function bildeUrl(v){
+  if (!v) return '';
+  if (typeof v === 'string') return URL_OK.test(v.trim()) ? v.trim() : '';
+  if (Array.isArray(v)) { for (const x of v) { const u = bildeUrl(x); if (u) return u; } return ''; }
+  if (typeof v === 'object') return bildeUrl(v.Url ?? v.URL ?? v.url ?? v.Src ?? v.Link ?? v.FileUrl ?? v.ImageUrl ?? v.Path);
+  return '';
+}
+function bilde(n){
+  if (n.Blob && n.Blob.BlobId && /^image\//i.test(n.Blob.MimeType || '')) return `/api/nyhetsbilde/${n.Blob.BlobId}`;
+  for (const [k, v] of Object.entries(n || {})) {
+    if (/image|picture|photo|bilde|thumb|media|attach|file/i.test(k)) { const u = bildeUrl(v); if (u) return u; }
+  }
+  const html = String(n.Text ?? n.Body ?? n.Content ?? n.Description ?? n.Teaser ?? '');
+  const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+  return m && URL_OK.test(m[1]) ? m[1].replace(/&amp;/g, '&') : '';
+}
+
 export default async () => {
   const key = Netlify.env.get('SPEEDADMIN_API_KEY');
   if (!key) return Response.json({ ok: false, feil: 'Mangler API-nøkkel' }, { status: 500 });
@@ -88,6 +108,7 @@ export default async () => {
             tekst: tekst(n.Text ?? n.Body ?? n.Content ?? n.Description ?? n.Teaser).slice(0, 160),
             fra: dato(n.Start),   // «Vises fra» i SpeedAdmin
             til: dato(n.End),     // «Vises til» i SpeedAdmin
+            bilde: bilde(n),
           }))
           .filter(n => n.tittel && !ALDRI_VIS.some(re => re.test(`${n.tittel} ${n.tekst}`)));
 

@@ -91,6 +91,13 @@ body{margin:0;background:#000;overflow:hidden;cursor:none}
 .news{display:flex;flex-direction:column;gap:14px}
 .news div{font:700 38px/1.1 var(--f)}
 .news div span{display:block;font:600 30px/1.15 var(--f);color:var(--dim)}
+/* Nyhet med bilde fra SpeedAdmin: tekst til venstre, bilde til høyre i den plassen som er ledig.
+   Blir bildet for lite (trang dag), skjules det og bare teksten vises. */
+.news:has(.harbilde){flex:1;min-height:0}
+.news div.harbilde{display:flex;gap:24px;align-items:flex-start;flex:1;min-height:0}
+.news .harbilde p{margin:0;flex:1;min-width:0}
+.news .harbilde img{flex:none;max-width:55%;max-height:100%;object-fit:contain;border-radius:8px}
+.closed img{max-height:380px;max-width:900px;object-fit:contain;border-radius:10px}
 .legend{margin-top:auto;display:flex;gap:30px;font:600 26px/1 var(--f);color:var(--dim)}
 .legend span{display:flex;align-items:center;gap:10px}
 .legend i{width:26px;height:20px;border-radius:4px;display:inline-block}
@@ -332,6 +339,8 @@ const KAKE = `<svg viewBox="0 0 64 64" aria-hidden="true"><g stroke="currentColo
 const BALLONG = `<svg class="ballong" viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="24" rx="15" ry="18" fill="#ef7fa0" stroke="currentColor" stroke-width="3.5"/><path d="M29 43l3-2 3 2z" fill="currentColor"/><path d="M32 44c-4 5 4 9 0 14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><ellipse cx="26" cy="17" rx="3.5" ry="6" fill="#fff" opacity=".6"/></svg>`;
 const navneliste = a => a.length < 2 ? a.join('') : `${a.slice(0, -1).join(', ')} og ${a[a.length - 1]}`;
 const mmdd = d => `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+// Test av nyhetsbilde: legg ?bilde=https://… bak adressen
+const TESTBILDE = new URLSearchParams(location.search).get('bilde') || '';
 // Test: legg ?bursdag=Navn (eller ?bursdag=Navn1,Navn2) bak adressen
 const TESTBURSDAG = (new URLSearchParams(location.search).get('bursdag') || '').split(',').map(x => x.trim()).filter(Boolean);
 // Lørdagsbursdager vises fredagen før («i morgen»), søndagsbursdager mandagen etter («gårsdagen»).
@@ -391,7 +400,8 @@ function render(){
   if (ferie || !rows.length) {
     const title = ferie ? ferie.navn : 'Ingen undervisning i dag';
     const sub = ferie ? 'Undervisningen starter igjen etter ferien.' : 'Velkommen tilbake mandag!';
-    stage.innerHTML = `${header}<div class="closed"><b>${esc(title)}</b><span>${esc(sub)}</span><span>${NYTT.map(x => esc(x.t) + ' · ' + esc(x.d)).join('<br>')}</span></div>`;
+    const bildeNytt = NYTT.find(x => x.b);
+    stage.innerHTML = `${header}<div class="closed"><b>${esc(title)}</b><span>${esc(sub)}</span><span>${NYTT.map(x => esc(x.t) + ' · ' + esc(x.d)).join('<br>')}</span>${bildeNytt ? `<img src="${esc(bildeNytt.b)}" alt="" onerror="this.remove()">` : ''}</div>`;
     tilpassBursdag(bursdag);
     return;
   }
@@ -404,7 +414,9 @@ function render(){
   // Plass til nytt på høyre side: ingen når rommene er fulle, ett når det er trangt
   const hoyreAntall = rows.filter(r => HOYRE.includes(r.rom)).length;
   const full = hoyreAntall > 8;
-  const antallNytt = Math.min(nyheter.length, full ? 0 : hoyreAntall > 5 ? 1 : 2);
+  let antallNytt = Math.min(nyheter.length, full ? 0 : hoyreAntall > 5 ? 1 : 2);
+  // Har den første nyheten bilde, får den hele feltet alene
+  if (antallNytt && nyheter[0].b) antallNytt = 1;
   stage.classList.toggle('compact', rows.filter(r => VENSTRE.includes(r.rom)).length > 10);
   // På fulle dager får en viktig melding plassen til fargeforklaringen
   const fullMelding = full && viktig.length ? `<div class="news"><div>${esc(viktig[0].t)}</div></div>` : '';
@@ -414,12 +426,24 @@ function render(){
       <div class="col right">${head}${roomRows(HOYRE, rows, n)}
         <div class="panel">
           ${antallNytt ? '<h2>Nytt fra kulturskolen</h2>' : ''}
-          <div class="news">${nyheter.slice(0, antallNytt).map(x => `<div>${esc(x.t)}<span>${esc(x.d)}</span></div>`).join('')}</div>
+          <div class="news">${nyheter.slice(0, antallNytt).map(nyhet).join('')}</div>
           ${fullMelding || `<div class="legend"><span><i style="background:var(--live)"></i>Pågår nå</span><span><i style="box-shadow:inset 0 0 0 3px var(--accent)"></i>Starter snart</span><span><i style="background:var(--past)"></i>Ferdig</span>${AVLYST.length ? '<span><i style="background:var(--offbg);box-shadow:inset 0 0 0 2px var(--off)"></i>Avlyst</span>' : ''}</div>`}
         </div>
       </div>
     </div>`;
   tilpassBursdag(bursdag);
+  sjekkBilder();
+}
+function nyhet(x){
+  if (!x.b) return `<div>${esc(x.t)}<span>${esc(x.d)}</span></div>`;
+  return `<div class="harbilde"><p>${esc(x.t)}<span>${esc(x.d)}</span></p><img src="${esc(x.b)}" alt=""></div>`;
+}
+// Bilder som ikke lastes, eller som blir mindre enn 150 px høye, fjernes, så teksten står alene
+function sjekkBilder(){
+  document.querySelectorAll('.news img').forEach(img => {
+    const vurder = () => { if (!img.naturalWidth || img.clientHeight < 150) img.remove(); };
+    img.complete ? vurder() : (img.onload = vurder, img.onerror = () => img.remove());
+  });
 }
 
 // ─── Kobling til SpeedAdmin (via /api/program på Netlify) ───
@@ -450,8 +474,9 @@ async function hentProgram(){
     const data = await svar.json();
     if (data.ok) {
       api = { hentet: Date.now(), grupper: data.grupper };
-      NYTT = (data.nyheter || []).map(x => ({ t: x.tittel, d: x.tekst }));
+      NYTT = (data.nyheter || []).map(x => ({ t: x.tittel, d: x.tekst, b: x.bilde || '' }));
       AVLYST = data.endringer || [];
+      if (TESTBILDE && NYTT[0]) NYTT[0].b = TESTBILDE;
       render();
     }
   } catch (e) { /* ingen nett eller SpeedAdmin nede: behold det som vises */ }
