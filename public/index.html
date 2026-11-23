@@ -272,6 +272,8 @@ const RUNDE = [
 // «Nytt fra kulturskolen» hentes fra SpeedAdmin (Portal › Nyheter › Legg til nyhet) via /api/program.
 // Er det ingen nyheter, vises ikke feltet.
 let NYTT = [];
+// Sekunder per nyhet når nyhetene må veksle (infoskjermen har to skjermer)
+const NYHET_SEK = 15;
 // Meldinger fra SpeedAdmin med «avlyst» eller «syk» i tittelen (vises i «Endringer i dag»)
 let AVLYST = [];
 
@@ -414,9 +416,10 @@ function render(){
   // Plass til nytt på høyre side: ingen når rommene er fulle, ett når det er trangt
   const hoyreAntall = rows.filter(r => HOYRE.includes(r.rom)).length;
   const full = hoyreAntall > 8;
-  let antallNytt = Math.min(nyheter.length, full ? 0 : hoyreAntall > 5 ? 1 : 2);
-  // Har den første nyheten bilde, får den hele feltet alene
-  if (antallNytt && nyheter[0].b) antallNytt = 1;
+  const plass = full ? 0 : hoyreAntall > 5 ? 1 : 2;
+  // Er det ikke plass til alle nyhetene samtidig, veksler de hvert 15. sekund (se NYHET_SEK)
+  const sider = plass ? nyhetssider(nyheter, plass) : [];
+  const side = sider.length ? sider[Math.floor(Date.now() / (NYHET_SEK * 1000)) % sider.length] : [];
   stage.classList.toggle('compact', rows.filter(r => VENSTRE.includes(r.rom)).length > 10);
   // På fulle dager får en viktig melding plassen til fargeforklaringen
   const fullMelding = full && viktig.length ? `<div class="news"><div>${esc(viktig[0].t)}</div></div>` : '';
@@ -425,14 +428,25 @@ function render(){
       <div class="col left">${head}${roomRows(VENSTRE, rows, n)}</div>
       <div class="col right">${head}${roomRows(HOYRE, rows, n)}
         <div class="panel">
-          ${antallNytt ? '<h2>Nytt fra kulturskolen</h2>' : ''}
-          <div class="news">${nyheter.slice(0, antallNytt).map(nyhet).join('')}</div>
+          ${side.length ? `<h2>Nytt fra kulturskolen${sider.length > 1 ? ` · ${sider.indexOf(side) + 1}/${sider.length}` : ''}</h2>` : ''}
+          <div class="news">${side.map(nyhet).join('')}</div>
           ${fullMelding || `<div class="legend"><span><i style="background:var(--live)"></i>Pågår nå</span><span><i style="box-shadow:inset 0 0 0 3px var(--accent)"></i>Starter snart</span><span><i style="background:var(--past)"></i>Ferdig</span>${AVLYST.length ? '<span><i style="background:var(--offbg);box-shadow:inset 0 0 0 2px var(--off)"></i>Avlyst</span>' : ''}</div>`}
         </div>
       </div>
     </div>`;
   tilpassBursdag(bursdag);
   sjekkBilder();
+}
+// Deler nyhetene i «sider» som vises etter tur: en nyhet med bilde står alene, ellers så mange som får plass
+function nyhetssider(liste, plass){
+  const sider = []; let side = [];
+  for (const x of liste) {
+    if (x.b) { if (side.length) sider.push(side); sider.push([x]); side = []; continue; }
+    side.push(x);
+    if (side.length === plass) { sider.push(side); side = []; }
+  }
+  if (side.length) sider.push(side);
+  return sider;
 }
 function nyhet(x){
   if (!x.b) return `<div>${esc(x.t)}<span>${esc(x.d)}</span></div>`;
@@ -492,7 +506,9 @@ function fit(){
 }
 window.addEventListener('resize', fit);
 fit(); render();
-setInterval(render, 20000);
+// Tegn skjermen på nytt hvert 15. sekund, i takt med klokka, så nyhetene bytter på faste tidspunkt
+// (infoskjermen har to skjermer, og 15 sekunder per nyhet passer med visningen der)
+(function tikk(){ setTimeout(() => { render(); tikk(); }, NYHET_SEK * 1000 - Date.now() % (NYHET_SEK * 1000) + 50); })();
 
 // Se etter en ny versjon på Netlify hvert 15. minutt. Siden lastes bare på nytt når den nye
 // versjonen faktisk kan hentes, så skjermen aldri blir stående med en feilside hvis nettet er nede.
