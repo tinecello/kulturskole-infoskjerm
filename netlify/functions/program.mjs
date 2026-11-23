@@ -65,7 +65,7 @@ function bilde(n){
   return m && URL_OK.test(m[1]) ? m[1].replace(/&amp;/g, '&') : '';
 }
 
-export default async (req) => {
+export default async () => {
   const key = Netlify.env.get('SPEEDADMIN_API_KEY');
   if (!key) return Response.json({ ok: false, feil: 'Mangler API-nøkkel' }, { status: 500 });
 
@@ -99,11 +99,6 @@ export default async (req) => {
       if (nr.ok) {
         const data = await nr.json();
         const liste = Array.isArray(data) ? data : (data.Results || []);
-        // MIDLERTIDIG (bare på test-grenen): ?felter=1 viser hvilke felt SpeedAdmin sender for nyhetene
-        if (new URL(req.url).searchParams.get('felter')) {
-          return Response.json(liste.slice(-4).map(n => Object.fromEntries(Object.entries(n).map(([k, v]) =>
-            [k, typeof v === 'string' ? v.slice(0, 300) : v]))), { headers: { 'Cache-Control': 'no-store' } });
-        }
         const idag = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Oslo' }); // ÅÅÅÅ-MM-DD norsk tid
         const tekst = s => rydd(String(s || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&'));
         const ENDRING = /\b(avlyst|avlyses|syk)/i;
