@@ -45,7 +45,25 @@ function laerere(s) {
   return alle.filter(n => !ALDRI_VIS.some(re => re.test(n))).join(', ');
 }
 
-export default async () => {
+// Bilde til en nyhet: eget bildefelt fra SpeedAdmin, ellers første <img> i nyhetsteksten.
+const URL_OK = /^(https?:\/\/|data:image\/)/i;
+function bildeUrl(v){
+  if (!v) return '';
+  if (typeof v === 'string') return URL_OK.test(v.trim()) ? v.trim() : '';
+  if (Array.isArray(v)) { for (const x of v) { const u = bildeUrl(x); if (u) return u; } return ''; }
+  if (typeof v === 'object') return bildeUrl(v.Url ?? v.URL ?? v.url ?? v.Src ?? v.Link ?? v.FileUrl ?? v.ImageUrl ?? v.Path);
+  return '';
+}
+function bilde(n){
+  for (const [k, v] of Object.entries(n || {})) {
+    if (/image|picture|photo|bilde|thumb|media|attach|file/i.test(k)) { const u = bildeUrl(v); if (u) return u; }
+  }
+  const html = String(n.Text ?? n.Body ?? n.Content ?? n.Description ?? n.Teaser ?? '');
+  const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+  return m && URL_OK.test(m[1]) ? m[1].replace(/&amp;/g, '&') : '';
+}
+
+export default async (req) => {
   const key = Netlify.env.get('SPEEDADMIN_API_KEY');
   if (!key) return Response.json({ ok: false, feil: 'Mangler API-nøkkel' }, { status: 500 });
 
@@ -79,6 +97,11 @@ export default async () => {
       if (nr.ok) {
         const data = await nr.json();
         const liste = Array.isArray(data) ? data : (data.Results || []);
+        // MIDLERTIDIG (bare på test-grenen): ?felter=1 viser hvilke felt SpeedAdmin sender for nyhetene
+        if (new URL(req.url).searchParams.get('felter')) {
+          return Response.json(liste.slice(0, 8).map(n => Object.fromEntries(Object.entries(n).map(([k, v]) =>
+            [k, typeof v === 'string' ? v.slice(0, 300) : v]))), { headers: { 'Cache-Control': 'no-store' } });
+        }
         const idag = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Oslo' }); // ÅÅÅÅ-MM-DD norsk tid
         const tekst = s => rydd(String(s || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&'));
         const ENDRING = /\b(avlyst|avlyses|syk)/i;
@@ -88,6 +111,7 @@ export default async () => {
             tekst: tekst(n.Text ?? n.Body ?? n.Content ?? n.Description ?? n.Teaser).slice(0, 160),
             fra: dato(n.Start),   // «Vises fra» i SpeedAdmin
             til: dato(n.End),     // «Vises til» i SpeedAdmin
+            bilde: bilde(n),
           }))
           .filter(n => n.tittel && !ALDRI_VIS.some(re => re.test(`${n.tittel} ${n.tekst}`)));
 
