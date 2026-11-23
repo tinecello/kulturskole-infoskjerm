@@ -45,7 +45,8 @@ function laerere(s) {
   return alle.filter(n => !ALDRI_VIS.some(re => re.test(n))).join(', ');
 }
 
-// Bilde til en nyhet: eget bildefelt fra SpeedAdmin, ellers første <img> i nyhetsteksten.
+// Bilde til en nyhet: bildet som er lastet opp på nyheten i SpeedAdmin (hentes via /api/nyhetsbilde),
+// ellers et annet bildefelt eller første <img> i nyhetsteksten.
 const URL_OK = /^(https?:\/\/|data:image\/)/i;
 function bildeUrl(v){
   if (!v) return '';
@@ -55,6 +56,7 @@ function bildeUrl(v){
   return '';
 }
 function bilde(n){
+  if (n.Blob && n.Blob.BlobId && /^image\//i.test(n.Blob.MimeType || '')) return `/api/nyhetsbilde/${n.Blob.BlobId}`;
   for (const [k, v] of Object.entries(n || {})) {
     if (/image|picture|photo|bilde|thumb|media|attach|file/i.test(k)) { const u = bildeUrl(v); if (u) return u; }
   }
@@ -99,7 +101,7 @@ export default async (req) => {
         const liste = Array.isArray(data) ? data : (data.Results || []);
         // MIDLERTIDIG (bare på test-grenen): ?felter=1 viser hvilke felt SpeedAdmin sender for nyhetene
         if (new URL(req.url).searchParams.get('felter')) {
-          return Response.json(liste.slice(0, 8).map(n => Object.fromEntries(Object.entries(n).map(([k, v]) =>
+          return Response.json(liste.slice(-4).map(n => Object.fromEntries(Object.entries(n).map(([k, v]) =>
             [k, typeof v === 'string' ? v.slice(0, 300) : v]))), { headers: { 'Cache-Control': 'no-store' } });
         }
         const idag = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Oslo' }); // ÅÅÅÅ-MM-DD norsk tid
